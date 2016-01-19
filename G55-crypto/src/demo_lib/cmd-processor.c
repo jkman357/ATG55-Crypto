@@ -74,6 +74,7 @@ int help(void)
 	printf("lockdata - lock data and OTP zones\r\n");
 	printf("info     - get the chip revision\r\n");
 	printf("sernum   - get the chip serial number\r\n");
+	printf("randnum	 - get a 32 byte random number from the CryptoAuth device\r\n");
 		
 	printf("\r\n");
 	return ATCA_SUCCESS;
@@ -174,7 +175,18 @@ int parseCmd( char *commands )
 		atcab_bin2hex(revision, 4, displaystr, &displaylen );
 		printf("\r\nrevision:\r\n%s\r\n", displaystr);
 				
-	} else if ( (cmds = strstr( commands, "sernum")) ) {
+	}else if((cmds = strstr( commands, "randnum"))){
+		uint8_t randout[32];
+		char displaystr[128];
+		int displaylen = sizeof(displaystr);
+		//int displaylen = 96;
+		atcab_random(randout);
+		
+		atcab_bin2hex(randout, 32, displaystr, &displaylen );
+		printf("\r\nrandom number:\r\n%s\r\n", displaystr);
+		
+
+	}else if ( (cmds = strstr( commands, "sernum")) ) {
 		uint8_t serialnum[ATCA_SERIAL_NUM_SIZE];
 		char displaystr[30];
 		int displaylen = sizeof(displaystr);
