@@ -67,7 +67,13 @@ static void configure_console(void)
 int main(void)
 {
 	uint8_t ch;
+	
+	uint8_t revision[4];
+	char displaystr[256];
+	int displaylen; 
 	uint8_t serialnum[ATCA_SERIAL_NUM_SIZE];
+	uint8_t random_number[32];
+	ATCA_STATUS status = ATCA_GEN_FAIL;
 
 	/* Initialize the SAM system */
 	sysclk_init();
@@ -79,25 +85,73 @@ int main(void)
 	configure_console();
 
 	/* Output example information */
-	puts(STRING_HEADER);
+	//puts(STRING_HEADER);
 	
 	atcab_init( &cfg_ateccx08a_i2c_default );
 	
-	while (true) {
-		
-		ch = 0;
-		
-		scanf("%c",&ch);
-		
-		if (ch) {
-			printf("%c",ch); // echo to output
-			if ( ch == 0x0d || ch == 0x0a ) {
-				processCmd();
-				} else {
-				CBUF_Push( cmdQ, ch );  // queue character into circular buffer
-			}
-		}
-	}
 	
+	displaylen = sizeof(displaystr);
+	atcab_info(revision);
+	// dump revision
+	atcab_bin2hex(revision, 4, displaystr, &displaylen );
+	printf("\r\nrevision:\r\n%s\r\n", displaystr);
 	
+	atcab_read_serial_number(serialnum);
+	displaylen = sizeof(displaystr);
+	// dump serial num
+	atcab_bin2hex(serialnum, ATCA_SERIAL_NUM_SIZE, displaystr, &displaylen );
+	printf("\r\nserial number:\r\n%s\r\n", displaystr);
+	
+	displaylen = sizeof(displaystr);
+	atcab_random(random_number);
+	atcab_bin2hex(random_number, 32, displaystr, &displaylen );
+	printf("\r\nrandom number:\r\n%s\r\n", displaystr);
+	
+	uint8_t public_key[64],get_public_key[64];
+	bool isLocked;
+	uint8_t frag[4] = { 0x44, 0x44, 0x44, 0x44 };
+	memset(public_key, 0x44, 64 );  // mark the key with bogus data
+	
+	status = atcab_is_locked( LOCK_ZONE_CONFIG, &isLocked );
+	if ( !isLocked )
+		printf("\r\nConfiguration zone must be locked for this test to succeed.\r\n");
+	
+	atcab_genkey(0, public_key);
+	displaylen = sizeof(displaystr);	
+	atcab_bin2hex(public_key, 64, displaystr, &displaylen );
+	printf("\r\n64 Bytes Public Key generation:\r\n%s\r\n", displaystr);
+	
+
+	atcab_is_locked( LOCK_ZONE_CONFIG, &isLocked );
+	if ( !isLocked )
+		printf("\r\nConfiguration zone must be locked for this test to succeed.\r\n");
+
+	atcab_get_pubkey(0, get_public_key);
+	displaylen = sizeof(displaystr);
+	atcab_bin2hex(get_public_key, 64, displaystr, &displaylen );
+	printf("\r\nGet 64 Bytes Public Key:\r\n%s\r\n", displaystr);
+
+	uint8_t msg[64];
+	uint8_t signature[ATCA_SIG_SIZE];
+	isLocked = false;
+
+	status = atcab_is_locked( LOCK_ZONE_CONFIG, &isLocked );
+	if ( !isLocked )
+		printf("\r\nConfiguration zone must be locked for this test to succeed.\r\n");
+
+	memset( msg, 0xAA, 64 );
+	memset( signature, 0, 64 );
+	//for(int i = 0; i < 64; i++)
+	//	msg[i] = i;
+
+	atcab_sign(0, msg, signature);
+	displaylen = sizeof(displaystr);
+	atcab_bin2hex(msg, 64, displaystr, &displaylen );
+	printf("\r\nMessage before Signature:\r\n%s\r\n", displaystr);
+	
+	displaylen = sizeof(displaystr);
+	atcab_bin2hex(signature, 64, displaystr, &displaylen );
+	printf("\r\nSignature:\r\n%s\r\n", displaystr);
+		
+	status = atcab_release();
 }
